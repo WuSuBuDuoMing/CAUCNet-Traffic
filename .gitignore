@@ -1,0 +1,8 @@
+node_modules/
+data/real_data.json
+data/user_info.html
+data/online_info.html
+data/account_info.html
+verification/
+*.log
+.env
