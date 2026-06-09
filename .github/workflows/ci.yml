@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  validate:
+    name: Validate Project Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check server.js exists
+        run: |
+          if [ ! -f server.js ]; then
+            echo "::error::server.js not found in project root"
+            exit 1
+          fi
+          echo "server.js found"
+
+      - name: Check public/ directory exists
+        run: |
+          if [ ! -d public ]; then
+            echo "::error::public/ directory not found"
+            exit 1
+          fi
+          echo "public/ directory found"
+
+      - name: Check public/index.html exists
+        run: |
+          if [ ! -f public/index.html ]; then
+            echo "::error::public/index.html not found"
+            exit 1
+          fi
+          echo "public/index.html found"
+
+      - name: Validate package.json
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            if (!pkg.name) { console.error('Missing package name'); process.exit(1); }
+            if (!pkg.version) { console.error('Missing package version'); process.exit(1); }
+            if (!pkg.scripts || !pkg.scripts.start) { console.error('Missing start script'); process.exit(1); }
+            console.log('package.json is valid');
+            console.log('  name:', pkg.name);
+            console.log('  version:', pkg.version);
+            console.log('  start:', pkg.scripts.start);
+          "
+
+  build:
+    name: Build & Syntax Check
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Syntax check server.js
+        run: node --check server.js
+
+      - name: Syntax check routes.js
+        run: |
+          if [ -f routes.js ]; then
+            node --check routes.js
+            echo "routes.js syntax OK"
+          else
+            echo "routes.js not found, skipping"
+          fi
+
+      - name: Syntax check service files
+        run: |
+          if [ -d services ]; then
+            for f in services/*.js; do
+              if [ -f "$f" ]; then
+                node --check "$f"
+                echo "$f syntax OK"
+              fi
+            done
+          else
+            echo "services/ not found, skipping"
+          fi
+
+      - name: Syntax check public JS files
+        run: |
+          if [ -d public/js ]; then
+            for f in public/js/*.js; do
+              if [ -f "$f" ]; then
+                node --check "$f"
+                echo "$f syntax OK"
+              fi
+            done
+          else
+            echo "public/js/ not found, skipping"
+          fi
