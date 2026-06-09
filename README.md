@@ -1,72 +1,194 @@
-# CAUCNet Traffic — 校园网流量助手
+# CAUCNet Traffic
 
-🌐 中国民航大学校园网流量实时监控工具
+> Campus network real-time traffic monitoring tool for Civil Aviation University of China (CAUC)
 
-## 功能特性
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D14-green.svg)](https://nodejs.org/)
+[![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
+[![Zero Dependencies (Frontend)](https://img.shields.io/badge/Frontend-Zero%20Dependencies-brightgreen.svg)](https://github.com/WuSuBuDuoMing/CAUCNet-Traffic)
 
-- ⚡ **实时网速** — 系统网卡真实速度，每秒更新
-- 📊 **流量概览** — 会话/今日/本月流量统计
-- 📈 **流量趋势** — 24小时真实流量曲线
-- 💻 **在线设备** — 实时设备列表，一键注销
-- 🔐 **登录状态** — IP/NAS/到期时间
-- 📡 **连接质量** — 实时 ping 延迟 + 质量评级
-- ⚡ **测速工具** — Cloudflare 测速节点
-- 🌙 **暗黑模式** — 手动/自动切换（夜间自动）
-- ⌨️ **快捷键** — `?` 帮助 / `D` 暗黑 / `R` 刷新 / `E` 导出
-- 📋 **数据导出** — CSV/JSON/TXT 格式
-- 🔔 **阈值告警** — 流量/余额超限自动提醒
-- 💾 **数据备份** — 一键导出配置
-- 📱 **响应式** — 桌面/平板/手机全适配
-- ♿ **无障碍** — prefers-reduced-motion + 键盘焦点
+[简体中文](README.zh-CN.md)
 
-## 快速开始
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Tech Stack](#tech-stack)
+- [API Reference](#api-reference)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Privacy & Security](#privacy--security)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Features
+
+- **Real-time Network Speed** -- Live upload and download speed monitoring
+- **Traffic Overview** -- Summary of total data usage across the campus network
+- **24-Hour Traffic Trend** -- Historical traffic visualization over the past 24 hours using Canvas 2D charts
+- **Online Device Management** -- View and manage connected devices on the network
+- **Login Status** -- Monitor campus network authentication state
+- **Connection Quality (Ping)** -- Test and display network latency and quality
+- **Speed Test** -- Cloudflare-based bandwidth testing
+- **Dark Mode** -- Manual toggle and automatic system-preference detection
+- **Keyboard Shortcuts** -- Quick access to common actions via hotkeys
+- **Data Export** -- Export traffic data in CSV, JSON, or TXT format
+- **Threshold Alerts** -- Configurable alerts when traffic exceeds set limits
+- **Data Backup** -- Backup and restore monitoring data
+- **Responsive Design** -- Works on desktop, tablet, and mobile screens
+- **Accessibility** -- Built with ARIA attributes and keyboard navigation support
+- **Server-Sent Events** -- Real-time data push without polling
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js** >= 14
+- **Windows OS** (uses `Get-NetAdapterStatistics` for local network stats)
+- **Playwright** (optional, for automatic campus network login)
+
+### Installation
 
 ```bash
-cd 04-CAUCNet-Traffic
+# Clone the repository
+git clone https://github.com/WuSuBuDuoMing/CAUCNet-Traffic.git
+cd CAUCNet-Traffic
+
+# Install dependencies
 npm install
-npm start
-# 访问 http://localhost:3004
+
+# (Optional) Install Playwright for auto-login
+npx playwright install chromium
 ```
 
-## 技术栈
+### Configuration
 
-- **后端**: Node.js + Express
-- **前端**: 原生 HTML/CSS/JS（零依赖）
-- **图表**: Canvas 2D API
-- **实时**: Server-Sent Events (SSE)
-- **数据**: Windows Get-NetAdapterStatistics + 校园网 API
+Copy the example configuration file and adjust values as needed:
 
-## API 端点
+```bash
+cp config.example.js config.js
+```
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/speed` | GET | 实时速度 |
-| `/api/overview` | GET | 流量概览 |
-| `/api/devices` | GET | 在线设备 |
-| `/api/stats` | GET | 流量统计 |
-| `/api/trend` | GET | 流量趋势 |
-| `/api/quality` | GET | 连接质量 |
-| `/api/speedtest` | GET | 测速 |
-| `/api/health` | GET | 健康检查 |
-| `/api/stream` | GET | SSE 实时推送 |
+Edit `config.js` to set your campus network credentials and preferences.
 
-## 快捷键
+### Run
 
-| 按键 | 功能 |
-|------|------|
-| `?` | 打开帮助 |
-| `D` | 切换暗黑模式 |
-| `R` | 刷新设备 |
-| `E` | 导出 CSV |
-| `Esc` | 关闭面板 |
+```bash
+# Start the server
+node server.js
 
-## 隐私
+# The dashboard will be available at
+# http://localhost:3000
+```
 
-- 默认使用占位符数据
-- 运行时通过 Playwright 自动登录校园网获取真实数据
-- 所有数据仅存储在本地，不上传任何服务器
-- MAC/IP 地址自动脱敏显示
+---
 
-## 许可
+## Tech Stack
 
-MIT License
+| Layer        | Technology                                                              |
+| ------------ | ----------------------------------------------------------------------- |
+| Backend      | Node.js + Express                                                       |
+| Frontend     | Vanilla HTML / CSS / JavaScript (zero dependencies)                     |
+| Charts       | Canvas 2D                                                               |
+| Real-time    | Server-Sent Events (SSE)                                                |
+| Network Data | Windows `Get-NetAdapterStatistics` + CAUC Campus Network API            |
+| Auto-login   | Playwright (headless Chromium)                                          |
+
+### Architecture Overview
+
+```text
++---------------------+        SSE         +------------------+
+|   Express Backend   | -----------------> |   Browser Client |
+|                     | <---- REST API --- |  (Vanilla JS)    |
++---------------------+                    +------------------+
+        |                                          |
+        v                                          v
+  Windows Network                          Canvas 2D Charts
+  + Campus API                             Export / Alerts
+```
+
+---
+
+## API Reference
+
+All endpoints are served from the Express backend.
+
+| Endpoint          | Method | Description                                     |
+| ----------------- | ------ | ----------------------------------------------- |
+| `/api/speed`      | GET    | Current upload and download speed               |
+| `/api/overview`   | GET    | Traffic usage summary                           |
+| `/api/devices`    | GET    | List of online devices                          |
+| `/api/stats`      | GET    | Detailed traffic statistics                     |
+| `/api/trend`      | GET    | 24-hour traffic trend data                      |
+| `/api/quality`    | GET    | Connection quality and latency metrics          |
+| `/api/speedtest`  | GET    | Trigger a Cloudflare speed test                 |
+| `/api/health`     | GET    | Server health check                             |
+| `/api/stream`     | GET    | SSE endpoint for real-time data push            |
+
+### Example
+
+```bash
+# Get current network speed
+curl http://localhost:3000/api/speed
+
+# Get 24-hour traffic trend
+curl http://localhost:3000/api/trend
+
+# Health check
+curl http://localhost:3000/api/health
+```
+
+---
+
+## Keyboard Shortcuts
+
+| Key   | Action                                    |
+| ----- | ----------------------------------------- |
+| `?`   | Open help / shortcut reference            |
+| `D`   | Toggle dark mode                          |
+| `R`   | Refresh current data                      |
+| `E`   | Export traffic data as CSV                |
+| `Esc` | Close modals and overlays                 |
+
+---
+
+## Privacy & Security
+
+CAUCNet Traffic is designed with privacy as a core principle:
+
+- **Placeholder Data by Default** -- The dashboard uses placeholder data when no real connection is available, so you can explore the UI without credentials.
+- **Auto-login via Playwright** -- Campus network authentication is handled locally through headless browser automation. Credentials never leave your machine.
+- **Local-only Storage** -- All traffic data is stored locally on the server. No data is sent to external services.
+- **MAC / IP Auto-masking** -- MAC addresses and IP addresses are automatically masked in the UI and exports to prevent accidental exposure.
+- **No Third-party Analytics** -- The frontend contains zero external dependencies and no tracking scripts.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -m "Add my feature"`
+4. Push to the branch: `git push origin feature/my-feature`
+5. Open a Pull Request.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+**[Back to top](#caucnet-traffic)**
+
+</div>
