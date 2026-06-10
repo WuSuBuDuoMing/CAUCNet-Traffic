@@ -29,3 +29,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Vanilla HTML/CSS/JS frontend (no framework dependencies)
 - CORS-enabled API for cross-origin requests
 - Dockerfile included for containerized deployment
+
+## [1.1.0] - 2026-06-10
+
+### Added
+- English README with comprehensive documentation and API reference
+- Chinese README (README.zh-CN.md)
+- GitHub Actions CI workflow (validate + syntax check)
+- Issue templates (Bug Report, Feature Request)
+- Pull Request template
+- CHANGELOG.md (this file)
+- CONTRIBUTING.md (bilingual English/Chinese)
+- npm package (`caucnet-traffic`) published to npm registry
+- npm publish workflow (publish.yml)
+- Website and Topics added to GitHub repository
+- Multi-platform installation guide (macOS, Linux, Windows, Docker)
+
+### Changed
+- Repository made public for open-source community
+- All commit authors unified to WuSuBuDuoMing
