@@ -43,12 +43,24 @@ npm start
 | `/api/speed` | GET | 实时速度 |
 | `/api/overview` | GET | 流量概览 |
 | `/api/devices` | GET | 在线设备 |
+| `/api/devices/:id/logout` | POST | 注销设备 |
 | `/api/stats` | GET | 流量统计 |
 | `/api/trend` | GET | 流量趋势 |
+| `/api/thresholds` | GET/POST | 阈值告警设置 |
+| `/api/login-status` | GET | 登录状态 |
 | `/api/quality` | GET | 连接质量 |
 | `/api/speedtest` | GET | 测速 |
 | `/api/health` | GET | 健康检查 |
 | `/api/stream` | GET | SSE 实时推送 |
+| `/api/network-info` | GET | 网络适配器信息 |
+| `/api/ip-info` | GET | IP 地理位置 |
+| `/api/bandwidth-analysis` | GET | 带宽分析 |
+| `/api/traffic-forecast` | GET | 流量预测 |
+| `/api/anomalies` | GET | 异常检测 |
+| `/api/history` | GET | 流量历史（`?hours=N`） |
+| `/api/settings` | GET/POST | 应用设置 |
+| `/api/backup` | GET | 数据备份 |
+| `/api/report` | GET | 使用报告 |
 
 ## 快捷键
 

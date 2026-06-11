@@ -48,3 +48,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Repository made public for open-source community
 - All commit authors unified to WuSuBuDuoMing
+
+## [1.2.0] - 2026-06-11
+
+### Added
+- Test suite using Node.js built-in test runner (44 tests)
+  - TrafficSimulator unit tests: constructor, getSpeed, getOverview, getDevices, logoutDevice, getStats, getTrend, thresholds, loginStatus, tick
+  - API integration tests: all 17 REST endpoints with supertest
+- JSDoc documentation for all public methods in TrafficSimulator
+- JSDoc for server.js module and broadcastSSE function
+- Full API reference in README.md (23 endpoints, up from 9)
+- Full API reference in README.zh-CN.md (21 endpoints, up from 9)
+
+### Changed
+- Updated express dependency from ^4.18.2 to ^4.21.2
+- Moved all `require()` calls to top of server.js (net, https, child_process)
+- Server version banner now reads from package.json instead of hardcoded string
+- Added `test` script to package.json
+
+### Fixed
+- Removed redundant inline `require()` calls in route handlers (net, https, execSync)

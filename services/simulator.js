@@ -1,10 +1,18 @@
 /**
  * CAUCNet Traffic - 流量模拟引擎
- * 真实用户数据 + 系统网卡速度采集
+ *
+ * 管理校园网流量数据，支持真实网卡速度采集和模拟数据回退。
+ * 提供实时速度、流量统计、设备管理、趋势分析等数据接口。
+ *
+ * @module services/simulator
  */
 
 const os = require('os');
 
+/**
+ * Traffic data engine — collects real NIC stats via Windows PowerShell
+ * and falls back to simulated data when unavailable.
+ */
 class TrafficSimulator {
   constructor() {
     // 账户信息（示例数据，运行时会被真实登录数据替换）
@@ -144,6 +152,10 @@ class TrafficSimulator {
     }
   }
 
+  /**
+   * Advance one tick — reads NIC counters and updates speed/traffic stats.
+   * Falls back to simulated data on first call or when PowerShell fails.
+   */
   tick() {
     // 读取真实网卡流量计数器，计算实际速度
     const stats = this._getRealTrafficStats();
@@ -206,6 +218,10 @@ class TrafficSimulator {
     }
   }
 
+  /**
+   * Get current upload/download speed in Mbps.
+   * @returns {{ download: number, upload: number, downloadPeak: number, uploadPeak: number }}
+   */
   getSpeed() {
     return {
       download: Math.round(this.speed.download * 100) / 100,
@@ -215,6 +231,10 @@ class TrafficSimulator {
     };
   }
 
+  /**
+   * Get traffic overview including account info, usage, and session duration.
+   * @returns {object} Overview data with isUnlimited, usedPercent, balance, etc.
+   */
   getOverview() {
     const isUnlimited = this.quota.total === Infinity;
     const usedPercent = isUnlimited ? 0 : (this.quota.used / this.quota.total * 100);
@@ -234,6 +254,10 @@ class TrafficSimulator {
     };
   }
 
+  /**
+   * Get list of active online devices with masked MAC/IP.
+   * @returns {Array<object>} Active devices with joinDuration and masked fields
+   */
   getDevices() {
     return this.devices.filter(d => d.active).map(d => ({
       ...d,
@@ -243,12 +267,21 @@ class TrafficSimulator {
     }));
   }
 
+  /**
+   * Logout (deactivate) a device by ID.
+   * @param {string} id - Device ID to deactivate
+   * @returns {boolean} True if device was found and deactivated
+   */
   logoutDevice(id) {
     const d = this.devices.find(d => d.id === id);
     if (d) { d.active = false; return true; }
     return false;
   }
 
+  /**
+   * Get today and month traffic statistics with automatic date rollover.
+   * @returns {{ today: object, month: object }}
+   */
   getStats() {
     // 自动日期滚动
     const today = new Date().toISOString().split('T')[0];
@@ -277,9 +310,16 @@ class TrafficSimulator {
     };
   }
 
-  getTrend() { return this.trafficHistory.slice(-60); } // 最近 60 个点
+  /** @returns {Array<object>} Last 60 trend data points */
+  getTrend() { return this.trafficHistory.slice(-60); }
+  /** @returns {object} Current threshold settings */
   getThresholds() { return this.thresholds; }
+  /**
+   * Merge new threshold values into current settings.
+   * @param {object} t - Partial threshold object
+   */
   setThresholds(t) { Object.assign(this.thresholds, t); }
+  /** @returns {object} Current login status */
   getLoginStatus() { return this.loginStatus; }
 }
 

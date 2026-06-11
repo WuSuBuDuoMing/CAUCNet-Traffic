@@ -118,17 +118,31 @@ node server.js
 
 All endpoints are served from the Express backend.
 
-| Endpoint          | Method | Description                                     |
-| ----------------- | ------ | ----------------------------------------------- |
-| `/api/speed`      | GET    | Current upload and download speed               |
-| `/api/overview`   | GET    | Traffic usage summary                           |
-| `/api/devices`    | GET    | List of online devices                          |
-| `/api/stats`      | GET    | Detailed traffic statistics                     |
-| `/api/trend`      | GET    | 24-hour traffic trend data                      |
-| `/api/quality`    | GET    | Connection quality and latency metrics          |
-| `/api/speedtest`  | GET    | Trigger a Cloudflare speed test                 |
-| `/api/health`     | GET    | Server health check                             |
-| `/api/stream`     | GET    | SSE endpoint for real-time data push            |
+| Endpoint                | Method | Description                                     |
+| ----------------------- | ------ | ----------------------------------------------- |
+| `/api/speed`            | GET    | Current upload and download speed               |
+| `/api/overview`         | GET    | Traffic usage summary                           |
+| `/api/devices`          | GET    | List of online devices                          |
+| `/api/devices/:id/logout` | POST | Logout (deactivate) a device                   |
+| `/api/stats`            | GET    | Today and monthly traffic statistics            |
+| `/api/trend`            | GET    | 24-hour traffic trend data                      |
+| `/api/thresholds`       | GET    | Get threshold alert settings                    |
+| `/api/thresholds`       | POST   | Update threshold alert settings                 |
+| `/api/login-status`     | GET    | Campus network login status                     |
+| `/api/quality`          | GET    | Connection quality and latency metrics          |
+| `/api/speedtest`        | GET    | Trigger a Cloudflare speed test                 |
+| `/api/health`           | GET    | Server health check                             |
+| `/api/stream`           | GET    | SSE endpoint for real-time data push            |
+| `/api/network-info`     | GET    | Active network adapter information              |
+| `/api/ip-info`          | GET    | IP geolocation info                             |
+| `/api/bandwidth-analysis` | GET  | Bandwidth usage analysis and projection         |
+| `/api/traffic-forecast` | GET    | Traffic usage forecast                          |
+| `/api/anomalies`        | GET    | Anomaly detection results                       |
+| `/api/history`          | GET    | Traffic history (query param: `hours`)          |
+| `/api/settings`         | GET    | Get app settings                                |
+| `/api/settings`         | POST   | Update app settings                             |
+| `/api/backup`           | GET    | Download data backup                            |
+| `/api/report`           | GET    | Generate usage report                           |
 
 ### Example
 

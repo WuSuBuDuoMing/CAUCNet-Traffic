@@ -1,11 +1,18 @@
 /**
  * CAUCNet Traffic — 校园网流量助手 Express 服务端
- * 提供 REST API 和 SSE 实时推送
+ *
+ * 提供 REST API 和 SSE 实时推送，支持实时网速监控、流量统计、
+ * 在线设备管理、连接质量检测、阈值告警等功能。
+ *
+ * @module server
  */
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const net = require('net');
+const https = require('https');
+const { execSync } = require('child_process');
 const { TrafficSimulator } = require('./services/simulator');
 
 const app = express();
@@ -38,6 +45,12 @@ const sim = new TrafficSimulator();
 // ============================
 const sseClients = new Set();
 
+/**
+ * Broadcast an SSE event to all connected clients.
+ * Removes clients that fail to write.
+ * @param {string} eventType - The SSE event name
+ * @param {object} data - JSON-serializable data payload
+ */
 app.locals.broadcastSSE = (eventType, data) => {
   const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const c of sseClients) { try { c.write(payload); } catch { sseClients.delete(c); } }
@@ -128,10 +141,10 @@ setInterval(() => {
 
 // ============================
 // 连接质量 — ping 延迟
+// ============================
 let pingLatency = 0;
 setInterval(() => {
   const start = Date.now();
-  const net = require('net');
   const socket = new net.Socket();
   socket.setTimeout(2000);
   socket.connect(80, '10.80.80.250', () => {
@@ -149,7 +162,6 @@ app.get('/api/quality', (req, res) => {
 // R31: 网络适配器信息
 app.get('/api/network-info', (req, res) => {
   try {
-    const { execSync } = require('child_process');
     const raw = execSync('powershell -NoProfile -Command "Get-NetAdapter | Where-Object {$_.Status -eq \\"Up\\"} | Select-Object Name,InterfaceDescription,LinkSpeed,MacAddress | ConvertTo-Json"', { encoding: 'utf-8', timeout: 5000, windowsHide: true });
     const adapters = JSON.parse(raw);
     res.json({ success: true, data: Array.isArray(adapters) ? adapters : [adapters] });
@@ -158,7 +170,6 @@ app.get('/api/network-info', (req, res) => {
 
 // R32: IP 地理位置
 app.get('/api/ip-info', (req, res) => {
-  const https = require('https');
   https.get('https://ipinfo.io/json', (r) => {
     let d = ''; r.on('data', c => d += c); r.on('end', () => {
       try { res.json({ success: true, data: JSON.parse(d) }); } catch { res.json({ success: false }); }
@@ -254,7 +265,6 @@ app.get('/api/report', (req, res) => {
 
 // 测速工具
 app.get('/api/speedtest', (req, res) => {
-  const https = require('https');
   const start = Date.now();
   https.get('https://speed.cloudflare.com/__down?bytes=10000000', (r) => {
     let bytes = 0;
@@ -282,9 +292,10 @@ app.use((err, req, res, next) => {
 });
 
 const server = app.listen(PORT, () => {
+  const { version } = require('./package.json');
   console.log('');
   console.log('  ╔══════════════════════════════════════════╗');
-  console.log('  ║     🌐 CAUCNet Traffic v1.0.0             ║');
+  console.log(`  ║     🌐 CAUCNet Traffic v${version}             ║`);
   console.log('  ║     校园网流量助手                        ║');
   console.log(`  ║     http://localhost:${PORT}                ║`);
   console.log('  ╚══════════════════════════════════════════╝');
