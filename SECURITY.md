@@ -2,22 +2,53 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it responsibly:
+We take security seriously. If you discover a security vulnerability in CAUCNet Traffic, please report it responsibly:
 
-1. **DO NOT** open a public GitHub issue
-2. Email the maintainer or use GitHub's private vulnerability reporting
-3. Include a description of the vulnerability and steps to reproduce
+1. **DO NOT** open a public GitHub issue for security vulnerabilities.
+2. Use [GitHub's private vulnerability reporting](https://github.com/WuSuBuDuoMing/CAUCNet-Traffic/security/advisories/new) to submit your report.
+3. Alternatively, email the maintainer at WuSuBuDuoMing@users.noreply.github.com.
+4. Include a detailed description of the vulnerability, steps to reproduce, and the potential impact.
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| Latest  | ✅ Yes    |
-| Older   | ❌ No     |
+| Version | Supported          |
+|---------|--------------------|
+| 1.10.x  | :white_check_mark: |
+| 1.9.x   | :white_check_mark: |
+| < 1.9   | :x:                |
 
-## Response Time
+## Response Timeline
 
-- Critical vulnerabilities: 24-48 hours
-- Non-critical: 7 days
+| Severity | Response Time  |
+|----------|----------------|
+| Critical | 24-48 hours    |
+| High     | 3-5 days       |
+| Medium   | 7 days         |
+| Low      | 14 days        |
 
-Thank you for helping keep this project safe!
+## Security Best Practices
+
+When deploying CAUCNet Traffic:
+
+- **Keep dependencies updated**: Run `npm audit` regularly and update packages.
+- **Use environment variables**: Never hardcode credentials in source code.
+- **Network isolation**: Run the server behind a reverse proxy or firewall.
+- **HTTPS**: Use TLS in production environments.
+- **Access control**: Restrict dashboard access to trusted networks.
+
+## Scope
+
+The following are in scope for security reports:
+
+- Remote code execution
+- Authentication bypass
+- Data exposure of user credentials or network information
+- Cross-site scripting (XSS) in the dashboard
+- Server-side request forgery (SSRF)
+- Dependency vulnerabilities with demonstrable impact
+
+## Acknowledgments
+
+We appreciate responsible disclosure and will acknowledge security researchers who help improve the project's security.
+
+Thank you for helping keep CAUCNet Traffic safe!

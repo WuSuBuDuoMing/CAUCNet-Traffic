@@ -13,7 +13,7 @@ describe('TrafficSimulator', () => {
     it('should initialize with default account info', () => {
       assert.ok(sim.account);
       assert.ok(sim.account.username);
-      assert.equal(sim.account.campus, '中国民航大学');
+      assert.equal(sim.account.campus, 'Civil Aviation University of China');
     });
 
     it('should initialize with unlimited quota', () => {

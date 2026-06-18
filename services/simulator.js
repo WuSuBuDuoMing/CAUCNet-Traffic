@@ -1,39 +1,64 @@
 /**
- * CAUCNet Traffic - 流量模拟引擎
+ * CAUCNet Traffic -- Traffic Simulation & Data Engine
  *
- * 管理校园网流量数据，支持真实网卡速度采集和模拟数据回退。
- * 提供实时速度、流量统计、设备管理、趋势分析等数据接口。
+ * Manages campus network traffic data with real NIC speed collection
+ * (Windows PowerShell) and simulated data fallback. Provides real-time
+ * speed, traffic statistics, device management, trend analysis, and
+ * threshold configuration.
  *
  * @module services/simulator
+ * @version 1.10.0
+ * @author WuSuBuDuoMing
+ * @license MIT
  */
 
 const os = require('os');
 
 /**
- * Traffic data engine — collects real NIC stats via Windows PowerShell
+ * Traffic data engine -- collects real NIC stats via Windows PowerShell
  * and falls back to simulated data when unavailable.
+ *
+ * @class TrafficSimulator
+ * @example
+ * const sim = new TrafficSimulator();
+ * setInterval(() => sim.tick(), 1000);
+ * console.log(sim.getSpeed()); // { download: 45.23, upload: 12.11, ... }
  */
 class TrafficSimulator {
+  /**
+   * Initialize the traffic simulator with default account, quota,
+   * device, and statistical data.
+   */
   constructor() {
-    // 账户信息（示例数据，运行时会被真实登录数据替换）
+    /**
+     * Campus network account information.
+     * Placeholder data; replaced at runtime with real login data.
+     * @type {{ username: string, realName: string, campus: string, plan: string, balance: number, idLast4: string, phone: string }}
+     */
     this.account = {
       username: '20**********',
-      realName: '示例用户',
-      campus: '中国民航大学',
-      plan: '电信包年 · 不限流',
+      realName: 'Demo User',
+      campus: 'Civil Aviation University of China',
+      plan: 'Annual Unlimited',
       balance: 0,
       idLast4: '****',
       phone: '138****0000',
     };
 
-    // 流量配额（不限流套餐）
+    /**
+     * Traffic quota configuration (unlimited plan).
+     * @type {{ total: number, used: number, sessionUsed: number }}
+     */
     this.quota = {
       total: Infinity,
-      used: 0, // 不限流，不统计总量
+      used: 0,
       sessionUsed: 0,
     };
 
-    // 速度（模拟）
+    /**
+     * Current speed readings in Mbps.
+     * @type {{ download: number, upload: number, downloadPeak: number, uploadPeak: number }}
+     */
     this.speed = {
       download: 0,
       upload: 0,
@@ -41,19 +66,28 @@ class TrafficSimulator {
       uploadPeak: 0,
     };
 
-    // 在线设备（示例数据，运行时会从校园网 API 获取真实数据）
+    /**
+     * Online device list (placeholder data).
+     * @type {Array<{ id: string, name: string, mac: string, ip: string, type: string, active: boolean, joinTime: number, service: string, accessType: string }>}
+     */
     this.devices = [
-      { id: 'd1', name: 'iPhone', mac: 'AA:BB:**:**:**:**', ip: '10.102.*.***', type: 'phone', active: true, joinTime: Date.now() - 3600000 * 3, service: '套餐默认服务', accessType: '无线' },
-      { id: 'd2', name: '电脑 有线', mac: 'CC:DD:**:**:**:**', ip: '10.102.*.***', type: 'pc', active: true, joinTime: Date.now() - 3600000 * 28, service: '套餐默认服务', accessType: '有线' },
-      { id: 'd3', name: '路由器', mac: 'EE:FF:**:**:**:**', ip: '10.102.*.***', type: 'router', active: true, joinTime: Date.now() - 3600000 * 12, service: '', accessType: '有线' },
+      { id: 'd1', name: 'iPhone', mac: 'AA:BB:**:**:**:**', ip: '10.102.*.***', type: 'phone', active: true, joinTime: Date.now() - 3600000 * 3, service: 'Default Service', accessType: 'Wireless' },
+      { id: 'd2', name: 'PC (Wired)', mac: 'CC:DD:**:**:**:**', ip: '10.102.*.***', type: 'pc', active: true, joinTime: Date.now() - 3600000 * 28, service: 'Default Service', accessType: 'Wired' },
+      { id: 'd3', name: 'Router', mac: 'EE:FF:**:**:**:**', ip: '10.102.*.***', type: 'router', active: true, joinTime: Date.now() - 3600000 * 12, service: '', accessType: 'Wired' },
     ];
 
-    // 网络连接信息（示例数据）
+    /**
+     * Network connection info (placeholder).
+     * @type {Array<{ ip: string, mac: string, accessType: string }>}
+     */
     this.connections = [
-      { ip: '10.***.***.***', mac: '**:**:**:**:**:**', accessType: '有线标准Portal接入' },
+      { ip: '10.***.***.***', mac: '**:**:**:**:**:**', accessType: 'Wired Portal' },
     ];
 
-    // 今日统计
+    /**
+     * Today's traffic statistics.
+     * @type {{ date: string, download: number, upload: number, peakDownload: number, sessionCount: number }}
+     */
     this.todayStats = {
       date: new Date().toISOString().split('T')[0],
       download: 2.3 * 1024 * 1024 * 1024,
@@ -62,7 +96,10 @@ class TrafficSimulator {
       sessionCount: 3,
     };
 
-    // 本月统计
+    /**
+     * Monthly traffic statistics.
+     * @type {{ month: string, download: number, upload: number, avgDaily: number }}
+     */
     this.monthStats = {
       month: new Date().toISOString().slice(0, 7),
       download: 15.2 * 1024 * 1024 * 1024,
@@ -70,32 +107,46 @@ class TrafficSimulator {
       avgDaily: 0.63 * 1024 * 1024 * 1024,
     };
 
-    // 趋势数据（实时累积）
-    this.trafficHistory = this._generateTrend(); // 初始模拟数据
-    this._lastSampleTime = Date.now();
-    this._sampleInterval = 60000; // 每分钟采样一次
+    /**
+     * Traffic trend history (real-time accumulation).
+     * @type {Array<{ time: string, hour: number, download: number, upload: number }>}
+     */
+    this.trafficHistory = this._generateTrend();
+    /** @private */ this._lastSampleTime = Date.now();
+    /** @private */ this._sampleInterval = 60000;
 
-    // 阈值设置
+    /**
+     * Threshold alert settings.
+     * @type {{ trafficWarn: number, balanceWarn: number, speedMin: number }}
+     */
     this.thresholds = {
-      trafficWarn: 80,    // 流量使用百分比警告
-      balanceWarn: 10,    // 余额警告（元）
-      speedMin: 0.5,      // 最低速度警告（Mbps）
+      trafficWarn: 80,
+      balanceWarn: 10,
+      speedMin: 0.5,
     };
 
-    // 登录状态（示例数据）
+    /**
+     * Campus network login status.
+     * @type {{ loggedIn: boolean, loginTime: number, expiresAt: number|null, ip: string, nasIp: string, accessType: string }}
+     */
     this.loginStatus = {
       loggedIn: true,
       loginTime: Date.now() - 3600000 * 3,
-      expiresAt: null, // 不限流套餐无到期时间
+      expiresAt: null,
       ip: '10.***.***.***',
       nasIp: '10.***.***.***',
-      accessType: '有线标准Portal接入',
+      accessType: 'Wired Portal',
     };
 
-    // 会话起始时间
+    /** @private Session start timestamp */
     this.sessionStart = Date.now();
   }
 
+  /**
+   * Generate initial 24-hour trend data with simulated day/night patterns.
+   * @private
+   * @returns {Array<{ time: string, hour: number, download: number, upload: number }>}
+   */
   _generateTrend() {
     const trend = [];
     const now = new Date();
@@ -103,7 +154,6 @@ class TrafficSimulator {
       const h = new Date(now);
       h.setHours(h.getHours() - i, 0, 0, 0);
       const hour = h.getHours();
-      // 模拟白天高、夜间低
       let base = 50;
       if (hour >= 8 && hour <= 12) base = 300;
       else if (hour >= 14 && hour <= 18) base = 250;
@@ -122,8 +172,12 @@ class TrafficSimulator {
   }
 
   /**
-   * 获取真实网卡流量统计 (Windows PowerShell)
-   * 缓存 3 秒，失败时指数退避重试（最多 30 秒）
+   * Fetch real NIC traffic statistics via Windows PowerShell.
+   * Caches results for 3 seconds; uses exponential backoff on failure
+   * (up to 30 seconds).
+   *
+   * @private
+   * @returns {{ rx: number, tx: number } | null} Cumulative bytes received/sent, or null on failure
    */
   _getRealTrafficStats() {
     const now = Date.now();
@@ -144,7 +198,7 @@ class TrafficSimulator {
       }
       this._trafficCache = { rx: totalRx, tx: totalTx };
       this._trafficCacheTime = now;
-      this._trafficFailed = 0; // 重置失败计数
+      this._trafficFailed = 0;
       return this._trafficCache;
     } catch (e) {
       this._trafficFailed = (this._trafficFailed || 0) + 1;
@@ -153,14 +207,14 @@ class TrafficSimulator {
   }
 
   /**
-   * Advance one tick — reads NIC counters and updates speed/traffic stats.
+   * Advance one tick -- reads NIC counters and updates speed/traffic stats.
    * Falls back to simulated data on first call or when PowerShell fails.
+   * Called every second by the SSE broadcast loop.
    */
   tick() {
-    // 读取真实网卡流量计数器，计算实际速度
     const stats = this._getRealTrafficStats();
     if (stats && this._lastTraffic) {
-      const dt = (Date.now() - this._lastTrafficTime) / 1000; // 秒
+      const dt = (Date.now() - this._lastTrafficTime) / 1000;
       if (dt > 0) {
         const rxDelta = stats.rx - this._lastTraffic.rx;
         const txDelta = stats.tx - this._lastTraffic.tx;
@@ -169,7 +223,6 @@ class TrafficSimulator {
         this.speed.upload = Math.max(0, (txDelta / dt) * 8 / (1024 * 1024));
         this.speed.downloadPeak = Math.max(this.speed.downloadPeak, this.speed.download);
         this.speed.uploadPeak = Math.max(this.speed.uploadPeak, this.speed.upload);
-        // 累计流量（基于真实增量）
         const dlBytes = Math.max(0, rxDelta);
         const ulBytes = Math.max(0, txDelta);
         this.quota.sessionUsed += dlBytes + ulBytes;
@@ -179,7 +232,7 @@ class TrafficSimulator {
         this.monthStats.upload += ulBytes;
       }
     } else {
-      // 首次采样或获取失败，用模拟数据
+      // Fallback: simulated data
       const isDaytime = (() => {
         const h = new Date().getHours();
         return h >= 8 && h <= 23;
@@ -200,7 +253,7 @@ class TrafficSimulator {
     this._lastTraffic = stats;
     this._lastTrafficTime = Date.now();
 
-    // 每分钟记录一个趋势数据点
+    // Sample one trend data point per minute
     if (Date.now() - this._lastSampleTime >= this._sampleInterval) {
       const now = new Date();
       const hour = now.getHours();
@@ -210,7 +263,6 @@ class TrafficSimulator {
         download: Math.round(this.speed.download * 10) / 10,
         upload: Math.round(this.speed.upload * 10) / 10,
       });
-      // 保留最近 1440 个点（24 小时 × 每分钟）
       if (this.trafficHistory.length > 1440) {
         this.trafficHistory.shift();
       }
@@ -219,7 +271,7 @@ class TrafficSimulator {
   }
 
   /**
-   * Get current upload/download speed in Mbps.
+   * Get current upload/download speed in Mbps with peak values.
    * @returns {{ download: number, upload: number, downloadPeak: number, uploadPeak: number }}
    */
   getSpeed() {
@@ -233,7 +285,7 @@ class TrafficSimulator {
 
   /**
    * Get traffic overview including account info, usage, and session duration.
-   * @returns {object} Overview data with isUnlimited, usedPercent, balance, etc.
+   * @returns {{ account: object, isUnlimited: boolean, usedBytes: number, totalBytes: number, usedGB: number, totalGB: number, remainingGB: number, usedPercent: number, balance: number, sessionUsedMB: number, sessionDuration: number }}
    */
   getOverview() {
     const isUnlimited = this.quota.total === Infinity;
@@ -255,8 +307,8 @@ class TrafficSimulator {
   }
 
   /**
-   * Get list of active online devices with masked MAC/IP.
-   * @returns {Array<object>} Active devices with joinDuration and masked fields
+   * Get list of active online devices with masked MAC/IP addresses.
+   * @returns {Array<{ id: string, name: string, mac: string, ip: string, type: string, active: boolean, joinTime: number, joinDuration: number, maskedMac: string, maskedIp: string }>}
    */
   getDevices() {
     return this.devices.filter(d => d.active).map(d => ({
@@ -280,10 +332,10 @@ class TrafficSimulator {
 
   /**
    * Get today and month traffic statistics with automatic date rollover.
-   * @returns {{ today: object, month: object }}
+   * Resets today's stats on date change; resets month stats on month change.
+   * @returns {{ today: { date: string, downloadGB: number, uploadGB: number, totalGB: number, peakMbps: number }, month: { month: string, downloadGB: number, uploadGB: number, totalGB: number, avgDailyGB: number } }}
    */
   getStats() {
-    // 自动日期滚动
     const today = new Date().toISOString().split('T')[0];
     if (this.todayStats.date !== today) {
       this.todayStats = { date: today, download: 0, upload: 0, peakDownload: 0, sessionCount: 0 };
@@ -310,16 +362,28 @@ class TrafficSimulator {
     };
   }
 
-  /** @returns {Array<object>} Last 60 trend data points */
+  /**
+   * Get the last 60 trend data points (covering the most recent ~60 minutes).
+   * @returns {Array<{ time: string, hour: number, download: number, upload: number }>}
+   */
   getTrend() { return this.trafficHistory.slice(-60); }
-  /** @returns {object} Current threshold settings */
+
+  /**
+   * Get current threshold settings.
+   * @returns {{ trafficWarn: number, balanceWarn: number, speedMin: number }}
+   */
   getThresholds() { return this.thresholds; }
+
   /**
    * Merge new threshold values into current settings.
-   * @param {object} t - Partial threshold object
+   * @param {Partial<{ trafficWarn: number, balanceWarn: number, speedMin: number }>} t - Threshold overrides
    */
   setThresholds(t) { Object.assign(this.thresholds, t); }
-  /** @returns {object} Current login status */
+
+  /**
+   * Get current campus network login status.
+   * @returns {{ loggedIn: boolean, loginTime: number, expiresAt: number|null, ip: string, nasIp: string, accessType: string }}
+   */
   getLoginStatus() { return this.loginStatus; }
 }
 

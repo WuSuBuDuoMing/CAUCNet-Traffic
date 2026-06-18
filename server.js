@@ -1,10 +1,14 @@
 /**
- * CAUCNet Traffic — 校园网流量助手 Express 服务端
+ * CAUCNet Traffic -- Campus Network Traffic Monitoring Server
  *
- * 提供 REST API 和 SSE 实时推送，支持实时网速监控、流量统计、
- * 在线设备管理、连接质量检测、阈值告警等功能。
+ * Provides a REST API and Server-Sent Events (SSE) push for real-time
+ * network speed monitoring, traffic statistics, online device management,
+ * connection quality checks, threshold alerts, and more.
  *
  * @module server
+ * @version 1.10.0
+ * @author WuSuBuDuoMing
+ * @license MIT
  */
 
 const express = require('express');
@@ -21,7 +25,7 @@ const PORT = process.env.PORT || 3004;
 app.use(cors());
 app.use(express.json());
 
-// R81-R88: 安全头 + 请求日志
+// Security headers + request logging
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -32,17 +36,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// R94: 静态文件缓存
+// Static file caching
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', etag: true }));
 
 // ============================
-// 模拟数据引擎
+// Traffic Simulation Engine
 // ============================
 const sim = new TrafficSimulator();
 
 // ============================
-// SSE 客户端
+// SSE Clients
 // ============================
+/** @type {Set<import('express').Response>} */
 const sseClients = new Set();
 
 /**
@@ -56,6 +61,12 @@ app.locals.broadcastSSE = (eventType, data) => {
   for (const c of sseClients) { try { c.write(payload); } catch { sseClients.delete(c); } }
 };
 
+/**
+ * SSE endpoint -- clients connect here to receive real-time updates.
+ * Sends a `connected` event on connect, heartbeats every 15s, and
+ * periodic speed/overview/stats/trend updates via the broadcast loop.
+ * @route GET /api/stream
+ */
 app.get('/api/stream', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -72,46 +83,81 @@ app.get('/api/stream', (req, res) => {
 // REST API
 // ============================
 
-// 实时速度
+/**
+ * Get current upload and download speed in Mbps.
+ * @route GET /api/speed
+ * @returns {{ success: true, data: { download: number, upload: number, downloadPeak: number, uploadPeak: number } }}
+ */
 app.get('/api/speed', (req, res) => {
   res.json({ success: true, data: sim.getSpeed() });
 });
 
-// 流量概览
+/**
+ * Get traffic overview including account info, usage, and session duration.
+ * @route GET /api/overview
+ * @returns {{ success: true, data: object }}
+ */
 app.get('/api/overview', (req, res) => {
   res.json({ success: true, data: sim.getOverview() });
 });
 
-// 在线设备
+/**
+ * Get list of active online devices with masked MAC/IP.
+ * @route GET /api/devices
+ * @returns {{ success: true, data: Array<object> }}
+ */
 app.get('/api/devices', (req, res) => {
   res.json({ success: true, data: sim.getDevices() });
 });
 
-// 注销设备
+/**
+ * Logout (deactivate) a device by ID.
+ * Broadcasts a `device_update` SSE event on success.
+ * @route POST /api/devices/:id/logout
+ * @param {string} req.params.id - Device ID
+ * @returns {{ success: boolean, message: string }}
+ */
 app.post('/api/devices/:id/logout', (req, res) => {
   const ok = sim.logoutDevice(req.params.id);
   if (ok) {
-    // 广播设备列表更新
     app.locals.broadcastSSE('device_update', { devices: sim.getDevices() });
   }
-  res.json({ success: ok, message: ok ? '设备已注销' : '设备不存在' });
+  res.json({ success: ok, message: ok ? 'Device logged out' : 'Device not found' });
 });
 
-// 今日/本月统计
+/**
+ * Get today and month traffic statistics.
+ * @route GET /api/stats
+ * @returns {{ success: true, data: { today: object, month: object } }}
+ */
 app.get('/api/stats', (req, res) => {
   res.json({ success: true, data: sim.getStats() });
 });
 
-// 流量趋势（最近24小时）
+/**
+ * Get traffic trend data for the last 24 hours.
+ * @route GET /api/trend
+ * @returns {{ success: true, data: Array<object> }}
+ */
 app.get('/api/trend', (req, res) => {
   res.json({ success: true, data: sim.getTrend() });
 });
 
-// 阈值设置
+/**
+ * Get current threshold alert settings.
+ * @route GET /api/thresholds
+ * @returns {{ success: true, data: object }}
+ */
 app.get('/api/thresholds', (req, res) => {
   res.json({ success: true, data: sim.getThresholds() });
 });
 
+/**
+ * Update threshold alert settings.
+ * @route POST /api/thresholds
+ * @param {object} req.body - Partial threshold settings to merge
+ * @returns {{ success: true }}
+ */
 app.post('/api/thresholds', (req, res) => {
   const t = req.body;
   if (t && typeof t === 'object') {
@@ -121,28 +167,33 @@ app.post('/api/thresholds', (req, res) => {
   res.json({ success: true });
 });
 
-// 登录状态
+/**
+ * Get campus network login status.
+ * @route GET /api/login-status
+ * @returns {{ success: true, data: object }}
+ */
 app.get('/api/login-status', (req, res) => {
   res.json({ success: true, data: sim.getLoginStatus() });
 });
 
 // ============================
-// SSE 推送循环
+// SSE Broadcast Loop
 // ============================
 setInterval(() => {
   sim.tick();
   const broadcast = app.locals.broadcastSSE;
   broadcast('speed_update', sim.getSpeed());
   broadcast('overview_update', sim.getOverview());
-  // 同步推送统计和趋势（与 tick 原子一致）
   broadcast('stats_update', sim.getStats());
   broadcast('trend_update', sim.getTrend());
 }, 1000);
 
 // ============================
-// 连接质量 — ping 延迟
+// Connection Quality -- Latency Measurement
 // ============================
+/** @type {number} Current ping latency in milliseconds */
 let pingLatency = 0;
+
 setInterval(() => {
   const start = Date.now();
   const socket = new net.Socket();
@@ -155,20 +206,42 @@ setInterval(() => {
   socket.on('timeout', () => { pingLatency = 999; socket.destroy(); });
 }, 5000);
 
+/**
+ * Get connection quality metrics (latency and quality rating).
+ * @route GET /api/quality
+ * @returns {{ success: true, data: { latencyMs: number, quality: string } }}
+ */
 app.get('/api/quality', (req, res) => {
-  res.json({ success: true, data: { latencyMs: pingLatency, quality: pingLatency < 20 ? 'excellent' : pingLatency < 50 ? 'good' : pingLatency < 100 ? 'fair' : 'poor' } });
+  res.json({
+    success: true,
+    data: {
+      latencyMs: pingLatency,
+      quality: pingLatency < 20 ? 'excellent' : pingLatency < 50 ? 'good' : pingLatency < 100 ? 'fair' : 'poor',
+    },
+  });
 });
 
-// R31: 网络适配器信息
+/**
+ * Get active network adapter information via Windows PowerShell.
+ * @route GET /api/network-info
+ * @returns {{ success: true, data: Array<{ Name: string, InterfaceDescription: string, LinkSpeed: string, MacAddress: string }> }}
+ */
 app.get('/api/network-info', (req, res) => {
   try {
-    const raw = execSync('powershell -NoProfile -Command "Get-NetAdapter | Where-Object {$_.Status -eq \\"Up\\"} | Select-Object Name,InterfaceDescription,LinkSpeed,MacAddress | ConvertTo-Json"', { encoding: 'utf-8', timeout: 5000, windowsHide: true });
+    const raw = execSync(
+      'powershell -NoProfile -Command "Get-NetAdapter | Where-Object {$_.Status -eq \\"Up\\"} | Select-Object Name,InterfaceDescription,LinkSpeed,MacAddress | ConvertTo-Json"',
+      { encoding: 'utf-8', timeout: 5000, windowsHide: true }
+    );
     const adapters = JSON.parse(raw);
     res.json({ success: true, data: Array.isArray(adapters) ? adapters : [adapters] });
   } catch { res.json({ success: true, data: [] }); }
 });
 
-// R32: IP 地理位置
+/**
+ * Get IP geolocation info from ipinfo.io.
+ * @route GET /api/ip-info
+ * @returns {{ success: boolean, data?: object }}
+ */
 app.get('/api/ip-info', (req, res) => {
   https.get('https://ipinfo.io/json', (r) => {
     let d = ''; r.on('data', c => d += c); r.on('end', () => {
@@ -177,51 +250,96 @@ app.get('/api/ip-info', (req, res) => {
   }).on('error', () => res.json({ success: false }));
 });
 
-// R33: 带宽分析
+/**
+ * Get bandwidth usage analysis and monthly projection.
+ * @route GET /api/bandwidth-analysis
+ * @returns {{ success: true, data: { avgDaily: string, projected: string, daysLeft: number, utilization: string } }}
+ */
 app.get('/api/bandwidth-analysis', (req, res) => {
   const stats = sim.getStats();
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const dayOfMonth = new Date().getDate();
   const avgDaily = dayOfMonth > 0 ? stats.month.totalGB / dayOfMonth : 0;
-  res.json({ success: true, data: { avgDaily: avgDaily.toFixed(2), projected: (avgDaily * daysInMonth).toFixed(1), daysLeft: daysInMonth - dayOfMonth, utilization: dayOfMonth > 0 ? (dayOfMonth / daysInMonth * 100).toFixed(0) : 0 } });
+  res.json({
+    success: true,
+    data: {
+      avgDaily: avgDaily.toFixed(2),
+      projected: (avgDaily * daysInMonth).toFixed(1),
+      daysLeft: daysInMonth - dayOfMonth,
+      utilization: dayOfMonth > 0 ? (dayOfMonth / daysInMonth * 100).toFixed(0) : 0,
+    },
+  });
 });
 
-// R34: 流量预测
+/**
+ * Get traffic usage forecast based on current consumption rate.
+ * @route GET /api/traffic-forecast
+ * @returns {{ success: true, data: { remaining24h: string, monthlyProjected: string } }}
+ */
 app.get('/api/traffic-forecast', (req, res) => {
   const stats = sim.getStats();
   const hoursLeft = 24 - new Date().getHours();
   const currentRate = stats.today.totalGB / Math.max(1, new Date().getHours());
-  const forecast = { remaining24h: (currentRate * hoursLeft).toFixed(1), monthlyProjected: (stats.month.totalGB / Math.max(1, new Date().getDate()) * 30).toFixed(1) };
+  const forecast = {
+    remaining24h: (currentRate * hoursLeft).toFixed(1),
+    monthlyProjected: (stats.month.totalGB / Math.max(1, new Date().getDate()) * 30).toFixed(1),
+  };
   res.json({ success: true, data: forecast });
 });
 
-// R35: 异常检测
+/**
+ * Get anomaly detection results based on speed and latency thresholds.
+ * @route GET /api/anomalies
+ * @returns {{ success: true, data: Array<{ type: string, msg: string, severity: string }> }}
+ */
 app.get('/api/anomalies', (req, res) => {
   const anomalies = [];
   const speed = sim.getSpeed();
-  if (speed.download < 1) anomalies.push({ type: 'low_speed', msg: '下载速度异常低', severity: 'warning' });
-  if (speed.download > 500) anomalies.push({ type: 'high_speed', msg: '下载速度异常高', severity: 'info' });
-  if (pingLatency > 200) anomalies.push({ type: 'high_latency', msg: '网络延迟过高', severity: 'warning' });
-  if (pingLatency > 500) anomalies.push({ type: 'timeout', msg: '网络可能中断', severity: 'error' });
+  if (speed.download < 1) anomalies.push({ type: 'low_speed', msg: 'Download speed abnormally low', severity: 'warning' });
+  if (speed.download > 500) anomalies.push({ type: 'high_speed', msg: 'Download speed abnormally high', severity: 'info' });
+  if (pingLatency > 200) anomalies.push({ type: 'high_latency', msg: 'Network latency too high', severity: 'warning' });
+  if (pingLatency > 500) anomalies.push({ type: 'timeout', msg: 'Network may be disconnected', severity: 'error' });
   res.json({ success: true, data: anomalies });
 });
 
-// R36: 历史记录
+// Traffic history log
+/** @type {Array<{ time: string, download: number, upload: number, latency: number }>} */
 const trafficLog = [];
 setInterval(() => {
   const speed = sim.getSpeed();
   trafficLog.push({ time: new Date().toISOString(), download: speed.download, upload: speed.upload, latency: pingLatency });
-  if (trafficLog.length > 8640) trafficLog.shift(); // 24h * 6 * 60s
+  if (trafficLog.length > 8640) trafficLog.shift(); // 24h * 6 samples/min * 60 min
 }, 10000);
+
+/**
+ * Get traffic history for the specified time window.
+ * @route GET /api/history
+ * @param {string} [req.query.hours=1] - Number of hours to look back
+ * @returns {{ success: true, data: Array<object> }}
+ */
 app.get('/api/history', (req, res) => {
   const hours = parseInt(req.query.hours) || 1;
   const cutoff = Date.now() - hours * 3600 * 1000;
   res.json({ success: true, data: trafficLog.filter(d => new Date(d.time).getTime() > cutoff) });
 });
 
-// R37: 设置
+// Application settings
+/** @type {{ autoDark: boolean, notifications: boolean, compactMode: boolean, refreshInterval: number }} */
 let appSettings = { autoDark: true, notifications: true, compactMode: false, refreshInterval: 1000 };
+
+/**
+ * Get application settings.
+ * @route GET /api/settings
+ * @returns {{ success: true, data: object }}
+ */
 app.get('/api/settings', (req, res) => res.json({ success: true, data: appSettings }));
+
+/**
+ * Update application settings. Only known keys with matching types are accepted.
+ * @route POST /api/settings
+ * @param {object} req.body - Partial settings to merge
+ * @returns {{ success: true, data: object }}
+ */
 app.post('/api/settings', (req, res) => {
   if (req.body && typeof req.body === 'object') {
     for (const [k, v] of Object.entries(req.body)) {
@@ -231,39 +349,68 @@ app.post('/api/settings', (req, res) => {
   res.json({ success: true, data: appSettings });
 });
 
-// R38: 通知（阈值告警）
+// Threshold alert check
+/** @type {{ traffic: boolean, balance: boolean }} */
 let alertSent = { traffic: false, balance: false };
+
+/**
+ * Check traffic and balance against thresholds and broadcast alerts via SSE.
+ * @private
+ */
 function checkAlerts() {
   const overview = sim.getOverview();
   const thresholds = sim.getThresholds();
   if (!overview.isUnlimited && overview.usedPercent > thresholds.trafficWarn && !alertSent.traffic) {
     alertSent.traffic = true;
-    app.locals.broadcastSSE('alert', { type: 'traffic', msg: '流量使用超过 ' + thresholds.trafficWarn + '%', severity: 'warning' });
+    app.locals.broadcastSSE('alert', { type: 'traffic', msg: `Traffic usage exceeds ${thresholds.trafficWarn}%`, severity: 'warning' });
   }
   if (overview.balance < thresholds.balanceWarn && overview.balance > 0 && !alertSent.balance) {
     alertSent.balance = true;
-    app.locals.broadcastSSE('alert', { type: 'balance', msg: '余额低于 ¥' + thresholds.balanceWarn, severity: 'warning' });
+    app.locals.broadcastSSE('alert', { type: 'balance', msg: `Balance below CNY ${thresholds.balanceWarn}`, severity: 'warning' });
   }
 }
 setInterval(checkAlerts, 30000);
 
-// R39: 数据备份/恢复
+/**
+ * Download a JSON backup of current settings, thresholds, and stats.
+ * @route GET /api/backup
+ * @returns {object} Backup data with exportTime
+ */
 app.get('/api/backup', (req, res) => {
   const data = { exportTime: new Date().toISOString(), settings: appSettings, thresholds: sim.getThresholds(), stats: sim.getStats() };
   res.setHeader('Content-Disposition', 'attachment; filename=caucnet-backup-' + new Date().toISOString().split('T')[0] + '.json');
   res.json(data);
 });
 
-// R40: 使用报告
+/**
+ * Generate a comprehensive usage report.
+ * @route GET /api/report
+ * @returns {{ success: true, data: object }}
+ */
 app.get('/api/report', (req, res) => {
   const stats = sim.getStats();
   const speed = sim.getSpeed();
   const quality = { latencyMs: pingLatency, quality: pingLatency < 20 ? 'excellent' : pingLatency < 50 ? 'good' : pingLatency < 100 ? 'fair' : 'poor' };
   const devices = sim.getDevices();
-  res.json({ success: true, data: { generatedAt: new Date().toISOString(), today: stats.today, month: stats.month, currentSpeed: speed, quality, onlineDevices: devices.length, account: sim.account } });
+  res.json({
+    success: true,
+    data: {
+      generatedAt: new Date().toISOString(),
+      today: stats.today,
+      month: stats.month,
+      currentSpeed: speed,
+      quality,
+      onlineDevices: devices.length,
+      account: sim.account,
+    },
+  });
 });
 
-// 测速工具
+/**
+ * Trigger a Cloudflare-based speed test (downloads 10 MB).
+ * @route GET /api/speedtest
+ * @returns {{ success: true, data: { speedMbps: number, bytes: number, elapsed: string } }}
+ */
 app.get('/api/speedtest', (req, res) => {
   const start = Date.now();
   https.get('https://speed.cloudflare.com/__down?bytes=10000000', (r) => {
@@ -276,7 +423,11 @@ app.get('/api/speedtest', (req, res) => {
   }).on('error', e => res.json({ success: false, error: e.message }));
 });
 
-// R85: 健康检查
+/**
+ * Server health check endpoint.
+ * @route GET /api/health
+ * @returns {{ status: string, uptime: string, memory: number, timestamp: string }}
+ */
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime().toFixed(0), memory: process.memoryUsage().heapUsed, timestamp: new Date().toISOString() });
 });
@@ -286,6 +437,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Global error handler
 app.use((err, req, res, next) => {
   console.error('[Server Error]', err.message);
   res.status(500).json({ success: false, error: 'Internal server error' });
@@ -294,14 +446,13 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, () => {
   const { version } = require('./package.json');
   console.log('');
-  console.log('  ╔══════════════════════════════════════════╗');
-  console.log(`  ║     🌐 CAUCNet Traffic v${version}             ║`);
-  console.log('  ║     校园网流量助手                        ║');
-  console.log(`  ║     http://localhost:${PORT}                ║`);
-  console.log('  ╚══════════════════════════════════════════╝');
+  console.log('  +------------------------------------------+');
+  console.log(`  |  CAUCNet Traffic v${version}                    |`);
+  console.log(`  |  http://localhost:${PORT}                     |`);
+  console.log('  +------------------------------------------+');
   console.log('');
 });
 
-// R97: 优雅关闭
+// Graceful shutdown
 process.on('SIGTERM', () => { console.log('[Server] SIGTERM received, shutting down...'); server.close(() => process.exit(0)); });
 process.on('SIGINT', () => { console.log('[Server] SIGINT received, shutting down...'); server.close(() => process.exit(0)); });

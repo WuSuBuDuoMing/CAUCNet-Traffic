@@ -6,14 +6,25 @@ Thank you for your interest in contributing to CAUCNet Traffic! This document pr
 
 ---
 
-## Development Setup / 开发环境搭建
+## Table of Contents
 
-### Prerequisites / 前置要求
+- [Development Setup](#development-setup)
+- [Coding Conventions](#coding-conventions)
+- [Commit Convention](#commit-convention)
+- [Pull Request Process](#pull-request-process)
+- [Reporting Issues](#reporting-issues)
+- [Questions](#questions)
+
+---
+
+## Development Setup
+
+### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18 or later / Node.js 18 或更高版本
 - [Git](https://git-scm.com/) / Git 版本控制工具
 
-### Getting Started / 快速开始
+### Getting Started
 
 ```bash
 # 1. Fork and clone the repository / Fork 并克隆仓库
@@ -27,20 +38,24 @@ npm install
 npm start
 
 # 4. Open your browser / 打开浏览器
-# Visit http://localhost:3000
-# 访问 http://localhost:3000
+# Visit http://localhost:3004
+# 访问 http://localhost:3004
+
+# 5. Run tests / 运行测试
+npm test
 ```
 
 ---
 
-## Coding Conventions / 代码规范
+## Coding Conventions
 
 ### JavaScript
 
 - Use `const` and `let`; avoid `var` / 使用 `const` 和 `let`，避免使用 `var`
 - Use meaningful variable and function names / 使用有意义的变量和函数名
-- Add comments for complex logic / 为复杂逻辑添加注释
+- Add JSDoc comments for all public functions / 为所有公共函数添加 JSDoc 注释
 - Keep functions small and focused / 保持函数简洁和单一职责
+- Use strict equality (`===`) / 使用严格相等运算符
 
 ### HTML & CSS
 
@@ -49,7 +64,7 @@ npm start
 - Support dark mode via `data-theme="dark"` attribute / 通过 `data-theme="dark"` 属性支持深色模式
 - Use CSS custom properties (variables) for theming / 使用 CSS 自定义属性（变量）实现主题
 
-### General / 通用
+### General
 
 - No trailing whitespace / 不留尾部空格
 - Use consistent indentation (2 spaces) / 使用一致的缩进（2 个空格）
@@ -57,7 +72,7 @@ npm start
 
 ---
 
-## Commit Convention / 提交规范
+## Commit Convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/). All commit messages must follow this format:
 
@@ -91,47 +106,52 @@ feat: add dark mode toggle to header
 fix: correct traffic calculation for IPv6
 docs: update README with deployment instructions
 style: format CSS with consistent indentation
+test: add unit tests for TrafficSimulator.getStats()
 ```
 
 ---
 
-## Pull Request Process / Pull Request 流程
+## Pull Request Process
 
-### Before Submitting / 提交前
+### Before Submitting
 
-1. Create a new branch from `master` / 从 `master` 创建新分支
+1. Create a new branch from `main` / 从 `main` 创建新分支
    ```bash
    git checkout -b feat/your-feature-name
    ```
 2. Make your changes / 进行修改
-3. Test thoroughly in the browser / 在浏览器中充分测试
+3. Run the test suite / 运行测试套件
+   ```bash
+   npm test
+   ```
+4. Test thoroughly in the browser / 在浏览器中充分测试
    - Test both light and dark mode / 测试亮色和深色模式
    - Test on different screen sizes / 测试不同屏幕尺寸
    - Verify no console errors / 确认无控制台错误
-4. Commit with a conventional commit message / 使用规范提交信息
-5. Push to your fork / 推送到你的 Fork
+5. Commit with a conventional commit message / 使用规范提交信息
+6. Push to your fork / 推送到你的 Fork
    ```bash
    git push origin feat/your-feature-name
    ```
 
-### Submitting a PR / 提交 PR
+### Submitting a PR
 
-1. Open a Pull Request against the `master` branch / 向 `master` 分支发起 Pull Request
+1. Open a Pull Request against the `main` branch / 向 `main` 分支发起 Pull Request
 2. Fill in the PR template completely / 完整填写 PR 模板
 3. Link any related issues / 关联相关 Issue
 4. Wait for review and address feedback / 等待审核并处理反馈
 
 ---
 
-## Reporting Issues / 报告问题
+## Reporting Issues
 
-- Use the [Bug Report](https://github.com/CAUCNet/Traffic/issues/new?template=bug_report.md) template for bugs / 使用 Bug 报告模板报告问题
-- Use the [Feature Request](https://github.com/CAUCNet/Traffic/issues/new?template=feature_request.md) template for suggestions / 使用功能请求模板提出建议
-- Search existing issues before creating a new one / 创建新 Issue 前先搜索已有 Issue
+- Use the [Bug Report](https://github.com/WuSuBuDuoMing/CAUCNet-Traffic/issues/new?template=bug_report.md) template for bugs
+- Use the [Feature Request](https://github.com/WuSuBuDuoMing/CAUCNet-Traffic/issues/new?template=feature_request.md) template for suggestions
+- Search existing issues before creating a new one
 
 ---
 
-## Questions? / 有疑问？
+## Questions?
 
 If you have questions, feel free to open an issue or reach out to the maintainers.
 
