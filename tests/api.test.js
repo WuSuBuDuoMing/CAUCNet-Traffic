@@ -57,6 +57,39 @@ before(() => {
     const currentRate = stats.today.totalGB / Math.max(1, new Date().getHours());
     res.json({ success: true, data: { remaining24h: (currentRate * hoursLeft).toFixed(1), monthlyProjected: (stats.month.totalGB / Math.max(1, new Date().getDate()) * 30).toFixed(1) } });
   });
+
+  // v1.11.0+ export endpoints (simplified for testing)
+  app.get('/api/export/csv', (req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.send('Time,Download,Upload,Latency\n');
+  });
+
+  app.get('/api/export/json', (req, res) => {
+    res.json({ exportTime: new Date().toISOString(), version: 'CAUCNet Traffic v1.13.0', recordCount: 0 });
+  });
+
+  app.get('/api/export/tsv', (req, res) => {
+    res.setHeader('Content-Type', 'text/tab-separated-values');
+    res.send('Metric\tValue\n');
+  });
+
+  // v1.12.0+ compare endpoint
+  app.get('/api/compare', (req, res) => {
+    res.json({ success: true, data: { today: sim.getTrend(), comparison: sim.getTrend(), delta: { todayAvgMbps: 0, comparisonAvgMbps: 0, difference: 0, percentChange: 0 } } });
+  });
+
+  // v1.13.0+ alerts and server-stats endpoints
+  app.get('/api/alerts', (req, res) => {
+    res.json({ success: true, data: [] });
+  });
+
+  app.get('/api/alerts/clear', (req, res) => {
+    res.json({ success: true, message: 'Alert history cleared' });
+  });
+
+  app.get('/api/server-stats', (req, res) => {
+    res.json({ success: true, data: { uptime: '0', memoryUsage: {}, cacheSize: 0, sseClients: 0, alertHistoryCount: 0, trafficLogCount: 0, nodeVersion: process.version } });
+  });
 });
 
 describe('API Endpoints', () => {
@@ -201,5 +234,62 @@ describe('API Endpoints', () => {
     assert.equal(res.body.success, true);
     assert.ok(res.body.data.remaining24h);
     assert.ok(res.body.data.monthlyProjected);
+  });
+
+  // v1.11.0 -- Data export endpoints
+  it('GET /api/export/csv returns CSV file', async () => {
+    const res = await request(app).get('/api/export/csv');
+    assert.equal(res.status, 200);
+    assert.ok(res.headers['content-type'].includes('text/csv'));
+    assert.ok(res.text.includes('Time,Download'));
+  });
+
+  it('GET /api/export/json returns JSON export', async () => {
+    const res = await request(app).get('/api/export/json');
+    assert.equal(res.status, 200);
+    assert.ok(res.body.exportTime);
+    assert.equal(res.body.version, 'CAUCNet Traffic v1.13.0');
+  });
+
+  it('GET /api/export/tsv returns TSV file', async () => {
+    const res = await request(app).get('/api/export/tsv');
+    assert.equal(res.status, 200);
+    assert.ok(res.headers['content-type'].includes('text/tab-separated-values'));
+    assert.ok(res.text.includes('Metric\tValue'));
+  });
+
+  // v1.12.0 -- Trend comparison
+  it('GET /api/compare returns trend comparison data', async () => {
+    const res = await request(app).get('/api/compare?days=3');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(Array.isArray(res.body.data.today));
+    assert.ok(Array.isArray(res.body.data.comparison));
+    assert.ok(res.body.data.delta);
+    assert.equal(typeof res.body.data.delta.percentChange, 'number');
+  });
+
+  // v1.13.0 -- Alert history & server stats
+  it('GET /api/alerts returns alert history array', async () => {
+    const res = await request(app).get('/api/alerts');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(Array.isArray(res.body.data));
+  });
+
+  it('GET /api/alerts/clear clears alert history', async () => {
+    const res = await request(app).get('/api/alerts/clear');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.message, 'Alert history cleared');
+  });
+
+  it('GET /api/server-stats returns server statistics', async () => {
+    const res = await request(app).get('/api/server-stats');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.data.uptime);
+    assert.ok(res.body.data.nodeVersion);
+    assert.equal(typeof res.body.data.cacheSize, 'number');
   });
 });

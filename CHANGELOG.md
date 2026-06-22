@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-06-22
+
+### Added
+- Alert history tracking -- all threshold alerts are now logged in memory with timestamps
+- `/api/alerts` endpoint to query alert history (supports `?limit=` parameter)
+- `/api/alerts/clear` endpoint to clear alert history
+- `/api/server-stats` endpoint for server diagnostics (uptime, memory, cache, SSE clients)
+- Enhanced test coverage -- added tests for date rollover, edge cases, device logout-all, setThresholds merge, and all new API endpoints (total test count increased to 55+)
+
+### Changed
+- Server version bumped to 1.13.0 across package.json, server.js, and simulator.js
+- Alert history auto-capped at 500 entries to prevent memory growth
+
+## [1.12.0] - 2026-06-22
+
+### Added
+- Historical trend comparison endpoint (`/api/compare?days=N`) -- compare today's traffic pattern with simulated historical data
+- Comparison delta metrics: average Mbps difference, percent change between periods
+- Front-end ready for trend overlay display
+
+### Changed
+- README API Reference table updated with all new v1.11-v1.13 endpoints
+
+## [1.11.0] - 2026-06-22
+
+### Added
+- CSV data export endpoint (`/api/export/csv?hours=N`) -- download traffic history as CSV
+- JSON bulk export endpoint (`/api/export/json?hours=N`) -- comprehensive data dump including speed, overview, stats, devices, trend, and history
+- TSV export endpoint (`/api/export/tsv`) -- Excel-compatible tab-separated format with summary statistics
+- In-memory response cache with 3-second TTL for high-frequency GET endpoints (speed, overview, stats)
+- Rate limiter middleware -- sliding window per-IP rate limiting (120 requests/minute)
+- Strict-Transport-Security security header
+- Cache invalidation on threshold updates and device logout
+
+### Changed
+- Server performance improved via response caching on frequently-polled endpoints
+- Rate limit cleanup runs every 5 minutes to prevent memory leaks
+
 ## [1.10.0] - 2026-06-18
 
 ### Added

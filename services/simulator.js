@@ -7,7 +7,7 @@
  * threshold configuration.
  *
  * @module services/simulator
- * @version 1.10.0
+ * @version 1.13.0
  * @author WuSuBuDuoMing
  * @license MIT
  */

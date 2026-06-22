@@ -227,5 +227,96 @@ describe('TrafficSimulator', () => {
       const afterMB = sim.getOverview().sessionUsedMB;
       assert.ok(afterMB >= beforeMB);
     });
+
+    it('should accumulate today stats on tick', () => {
+      const before = sim.getStats().today.totalGB;
+      sim.tick();
+      const after = sim.getStats().today.totalGB;
+      assert.ok(after >= before);
+    });
+
+    it('should accumulate month stats on tick', () => {
+      const before = sim.getStats().month.totalGB;
+      sim.tick();
+      const after = sim.getStats().month.totalGB;
+      assert.ok(after >= before);
+    });
+  });
+
+  describe('getSpeed() edge cases', () => {
+    it('should return rounded values to 2 decimal places', () => {
+      sim.tick();
+      const speed = sim.getSpeed();
+      const dlStr = speed.download.toString();
+      const parts = dlStr.split('.');
+      if (parts.length === 2) {
+        assert.ok(parts[1].length <= 2);
+      }
+    });
+
+    it('should track peak download speed', () => {
+      sim.speed.download = 500;
+      sim.speed.downloadPeak = 0;
+      sim.tick();
+      const speed = sim.getSpeed();
+      assert.ok(speed.downloadPeak >= 0);
+    });
+  });
+
+  describe('getOverview() with limited quota', () => {
+    it('should report percentage when quota is finite', () => {
+      sim.quota.total = 100 * 1024 * 1024 * 1024; // 100 GB
+      sim.quota.used = 50 * 1024 * 1024 * 1024;   // 50 GB
+      const ov = sim.getOverview();
+      assert.equal(ov.isUnlimited, false);
+      assert.equal(typeof ov.usedPercent, 'number');
+      assert.ok(ov.usedPercent > 0);
+    });
+  });
+
+  describe('getStats() date rollover', () => {
+    it('should reset today stats on date change', () => {
+      sim.todayStats.date = '2020-01-01';
+      sim.todayStats.download = 999999;
+      sim.getStats();
+      assert.equal(sim.todayStats.download, 0);
+    });
+
+    it('should reset month stats on month change', () => {
+      sim.monthStats.month = '2020-01';
+      sim.monthStats.download = 999999;
+      sim.getStats();
+      assert.equal(sim.monthStats.download, 0);
+    });
+  });
+
+  describe('setThresholds()', () => {
+    it('should merge partial threshold overrides', () => {
+      sim.setThresholds({ speedMin: 1.0 });
+      assert.equal(sim.thresholds.speedMin, 1.0);
+      assert.equal(sim.thresholds.trafficWarn, 80); // unchanged
+    });
+
+    it('should not affect existing keys when overriding others', () => {
+      sim.setThresholds({ speedMin: 1.0 });
+      assert.equal(sim.thresholds.speedMin, 1.0);
+      assert.equal(sim.thresholds.trafficWarn, 80);
+      assert.equal(sim.thresholds.balanceWarn, 10);
+    });
+  });
+
+  describe('device management', () => {
+    it('should support logout of all devices', () => {
+      const ids = sim.devices.map(d => d.id);
+      ids.forEach(id => sim.logoutDevice(id));
+      assert.equal(sim.getDevices().length, 0);
+    });
+
+    it('should track joinDuration on devices', () => {
+      const devices = sim.getDevices();
+      for (const d of devices) {
+        assert.ok(d.joinDuration >= 0);
+      }
+    });
   });
 });

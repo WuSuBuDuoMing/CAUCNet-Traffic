@@ -483,7 +483,7 @@
 
         const diagnosticData = {
           exportTime: new Date().toISOString(),
-          version: 'CAUCNet Traffic v1.2.0',
+          version: 'CAUCNet Traffic v1.13.0',
           privacy: '此诊断包已自动脱敏，不包含明文密码、完整账号、Cookie、IP 或 MAC 地址',
           speed: sanitize(speedRes.data),
           overview: sanitize(overviewRes.data),
@@ -743,7 +743,7 @@
     });
 
     // R30: 版本显示
-    console.log('%c CAUCNet Traffic v1.2.0 ', 'background:#22c55e;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
+    console.log('%c CAUCNet Traffic v1.13.0 ', 'background:#22c55e;color:#fff;padding:4px 8px;border-radius:4px;font-weight:bold');
 
     // R41: 网络适配器信息
     async function fetchNetworkInfo() {

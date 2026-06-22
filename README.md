@@ -191,6 +191,13 @@ All endpoints are served from the Express backend.
 | `/api/settings`           | POST   | Update app settings                             |
 | `/api/backup`             | GET    | Download data backup                            |
 | `/api/report`             | GET    | Generate usage report                           |
+| `/api/export/csv`         | GET    | Export traffic history as CSV (param: `hours`)  |
+| `/api/export/json`        | GET    | Export all data as JSON (param: `hours`)        |
+| `/api/export/tsv`         | GET    | Export stats as Excel-compatible TSV            |
+| `/api/compare`            | GET    | Compare today's trend with historical (param: `days`) |
+| `/api/alerts`             | GET    | Query alert history (param: `limit`)            |
+| `/api/alerts/clear`       | GET    | Clear alert history                             |
+| `/api/server-stats`       | GET    | Server diagnostics (uptime, memory, cache)      |
 
 ### Examples
 

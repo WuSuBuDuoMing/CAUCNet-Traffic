@@ -6,7 +6,7 @@
  * connection quality checks, threshold alerts, and more.
  *
  * @module server
- * @version 1.10.0
+ * @version 1.13.0
  * @author WuSuBuDuoMing
  * @license MIT
  */
@@ -25,16 +25,78 @@ const PORT = process.env.PORT || 3004;
 app.use(cors());
 app.use(express.json());
 
+// ============================
+// Response Cache (in-memory, TTL-based)
+// ============================
+const responseCache = new Map();
+const CACHE_TTL = 3000; // 3 seconds default
+
+/**
+ * Cache middleware for GET endpoints.
+ * @param {string} key - Cache key
+ * @param {number} [ttl=CACHE_TTL] - Time-to-live in ms
+ */
+function cacheMiddleware(key, ttl = CACHE_TTL) {
+  return (req, res, next) => {
+    const cached = responseCache.get(key);
+    if (cached && (Date.now() - cached.time) < ttl) {
+      return res.json(cached.data);
+    }
+    const originalJson = res.json.bind(res);
+    res.json = (data) => {
+      responseCache.set(key, { data, time: Date.now() });
+      return originalJson(data);
+    };
+    next();
+  };
+}
+
+// ============================
+// Rate Limiter (per-IP, sliding window)
+// ============================
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 120;      // max requests per window
+
+function rateLimiter(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  let entry = rateLimitMap.get(ip);
+  if (!entry) {
+    entry = { timestamps: [] };
+    rateLimitMap.set(ip, entry);
+  }
+  // Purge expired timestamps
+  entry.timestamps = entry.timestamps.filter(t => now - t < RATE_LIMIT_WINDOW);
+  if (entry.timestamps.length >= RATE_LIMIT_MAX) {
+    return res.status(429).json({ success: false, error: 'Too many requests. Please try again later.' });
+  }
+  entry.timestamps.push(now);
+  next();
+}
+
+// Periodic cleanup of stale rate limit entries (every 5 minutes)
+setInterval(() => {
+  const cutoff = Date.now() - RATE_LIMIT_WINDOW;
+  for (const [ip, entry] of rateLimitMap) {
+    entry.timestamps = entry.timestamps.filter(t => t > cutoff);
+    if (entry.timestamps.length === 0) rateLimitMap.delete(ip);
+  }
+}, 300000);
+
 // Security headers + request logging
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (req.path.startsWith('/api/')) {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   }
   next();
 });
+
+app.use(rateLimiter);
 
 // Static file caching
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', etag: true }));
@@ -88,7 +150,7 @@ app.get('/api/stream', (req, res) => {
  * @route GET /api/speed
  * @returns {{ success: true, data: { download: number, upload: number, downloadPeak: number, uploadPeak: number } }}
  */
-app.get('/api/speed', (req, res) => {
+app.get('/api/speed', cacheMiddleware('speed'), (req, res) => {
   res.json({ success: true, data: sim.getSpeed() });
 });
 
@@ -97,7 +159,7 @@ app.get('/api/speed', (req, res) => {
  * @route GET /api/overview
  * @returns {{ success: true, data: object }}
  */
-app.get('/api/overview', (req, res) => {
+app.get('/api/overview', cacheMiddleware('overview'), (req, res) => {
   res.json({ success: true, data: sim.getOverview() });
 });
 
@@ -120,6 +182,7 @@ app.get('/api/devices', (req, res) => {
 app.post('/api/devices/:id/logout', (req, res) => {
   const ok = sim.logoutDevice(req.params.id);
   if (ok) {
+    responseCache.delete('devices');
     app.locals.broadcastSSE('device_update', { devices: sim.getDevices() });
   }
   res.json({ success: ok, message: ok ? 'Device logged out' : 'Device not found' });
@@ -130,7 +193,7 @@ app.post('/api/devices/:id/logout', (req, res) => {
  * @route GET /api/stats
  * @returns {{ success: true, data: { today: object, month: object } }}
  */
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', cacheMiddleware('stats'), (req, res) => {
   res.json({ success: true, data: sim.getStats() });
 });
 
@@ -164,6 +227,7 @@ app.post('/api/thresholds', (req, res) => {
     if (typeof t.trafficWarn === 'number') sim.thresholds.trafficWarn = t.trafficWarn;
     if (typeof t.balanceWarn === 'number') sim.thresholds.balanceWarn = t.balanceWarn;
   }
+  responseCache.delete('thresholds');
   res.json({ success: true });
 });
 
@@ -174,6 +238,169 @@ app.post('/api/thresholds', (req, res) => {
  */
 app.get('/api/login-status', (req, res) => {
   res.json({ success: true, data: sim.getLoginStatus() });
+});
+
+// ============================
+// v1.11.0 -- Data Export Endpoints
+// ============================
+
+/**
+ * Export traffic history as CSV.
+ * @route GET /api/export/csv
+ * @param {string} [req.query.hours=24] - Number of hours to export
+ * @returns {csv} CSV file download
+ */
+app.get('/api/export/csv', (req, res) => {
+  const hours = parseInt(req.query.hours) || 24;
+  const cutoff = Date.now() - hours * 3600 * 1000;
+  const data = trafficLog.filter(d => new Date(d.time).getTime() > cutoff);
+  const header = 'Time,Download (Mbps),Upload (Mbps),Latency (ms)\n';
+  const rows = data.map(d => `${d.time},${d.download.toFixed(2)},${d.upload.toFixed(2)},${d.latency}`).join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename=caucnet-traffic-export-${new Date().toISOString().split('T')[0]}.csv`);
+  res.send(header + rows);
+});
+
+/**
+ * Export traffic history as JSON (bulk download).
+ * @route GET /api/export/json
+ * @param {string} [req.query.hours=24] - Number of hours to export
+ * @returns {object} JSON file download
+ */
+app.get('/api/export/json', (req, res) => {
+  const hours = parseInt(req.query.hours) || 24;
+  const cutoff = Date.now() - hours * 3600 * 1000;
+  const data = trafficLog.filter(d => new Date(d.time).getTime() > cutoff);
+  const exportData = {
+    exportTime: new Date().toISOString(),
+    version: 'CAUCNet Traffic v1.13.0',
+    hours,
+    recordCount: data.length,
+    speed: sim.getSpeed(),
+    overview: sim.getOverview(),
+    stats: sim.getStats(),
+    devices: sim.getDevices(),
+    trend: sim.getTrend(),
+    history: data,
+  };
+  res.setHeader('Content-Disposition', `attachment; filename=caucnet-traffic-export-${new Date().toISOString().split('T')[0]}.json`);
+  res.json(exportData);
+});
+
+/**
+ * Export current stats as Excel-compatible TSV (tab-separated).
+ * @route GET /api/export/tsv
+ * @returns {tsv} TSV file download
+ */
+app.get('/api/export/tsv', (req, res) => {
+  const stats = sim.getStats();
+  const overview = sim.getOverview();
+  const header = 'Metric\tValue\n';
+  const rows = [
+    `Export Time\t${new Date().toISOString()}`,
+    `Today Download (GB)\t${stats.today.downloadGB}`,
+    `Today Upload (GB)\t${stats.today.uploadGB}`,
+    `Today Total (GB)\t${stats.today.totalGB}`,
+    `Month Download (GB)\t${stats.month.downloadGB}`,
+    `Month Upload (GB)\t${stats.month.uploadGB}`,
+    `Month Total (GB)\t${stats.month.totalGB}`,
+    `Month Avg Daily (GB)\t${stats.month.avgDailyGB}`,
+    `Balance\t${overview.balance}`,
+    `Session Used (MB)\t${overview.sessionUsedMB}`,
+    `Session Duration (s)\t${overview.sessionDuration}`,
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/tab-separated-values; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename=caucnet-traffic-stats-${new Date().toISOString().split('T')[0]}.tsv`);
+  res.send(header + rows);
+});
+
+// ============================
+// v1.12.0 -- Historical Trend Comparison
+// ============================
+
+/**
+ * Compare today's traffic trend with a previous day.
+ * @route GET /api/compare
+ * @param {string} [req.query.days=1] - Number of days to compare (1-7)
+ * @returns {{ success: true, data: { today: Array, comparison: Array, delta: object } }}
+ */
+app.get('/api/compare', (req, res) => {
+  const days = Math.min(Math.max(parseInt(req.query.days) || 1, 1), 7);
+  const todayTrend = sim.getTrend();
+  // Generate simulated comparison data (mirrors the current day with slight variation)
+  const comparisonTrend = todayTrend.map(p => ({
+    time: p.time,
+    hour: p.hour,
+    download: Math.round(p.download * (0.7 + Math.random() * 0.6) * 10) / 10,
+    upload: Math.round(p.upload * (0.7 + Math.random() * 0.6) * 10) / 10,
+  }));
+  const todayAvg = todayTrend.length > 0 ? todayTrend.reduce((s, p) => s + p.download, 0) / todayTrend.length : 0;
+  const compAvg = comparisonTrend.length > 0 ? comparisonTrend.reduce((s, p) => s + p.download, 0) / comparisonTrend.length : 0;
+  res.json({
+    success: true,
+    data: {
+      today: todayTrend,
+      comparison: comparisonTrend,
+      delta: {
+        todayAvgMbps: Math.round(todayAvg * 10) / 10,
+        comparisonAvgMbps: Math.round(compAvg * 10) / 10,
+        difference: Math.round((todayAvg - compAvg) * 10) / 10,
+        percentChange: compAvg > 0 ? Math.round((todayAvg - compAvg) / compAvg * 100) : 0,
+      },
+    },
+  });
+});
+
+// ============================
+// v1.13.0 -- Enhanced Threshold Alerts & Alert History
+// ============================
+
+/** @type {Array<{ time: string, type: string, message: string, severity: string }>} */
+const alertHistory = [];
+
+/**
+ * Get full alert history log.
+ * @route GET /api/alerts
+ * @param {string} [req.query.limit=50] - Max records to return
+ * @returns {{ success: true, data: Array<object> }}
+ */
+app.get('/api/alerts', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 500);
+  res.json({ success: true, data: alertHistory.slice(-limit) });
+});
+
+/**
+ * Clear alert history.
+ * @route POST /api/alerts/clear
+ * @returns {{ success: true, message: string }}
+ */
+app.get('/api/alerts/clear', (req, res) => {
+  alertHistory.length = 0;
+  res.json({ success: true, message: 'Alert history cleared' });
+});
+
+/**
+ * Get server-side statistics (uptime, memory, cache stats, request count).
+ * @route GET /api/server-stats
+ * @returns {{ success: true, data: object }}
+ */
+app.get('/api/server-stats', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      uptime: process.uptime().toFixed(0),
+      memoryUsage: {
+        heapUsed: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1) + ' MB',
+        heapTotal: (process.memoryUsage().heapTotal / 1024 / 1024).toFixed(1) + ' MB',
+        rss: (process.memoryUsage().rss / 1024 / 1024).toFixed(1) + ' MB',
+      },
+      cacheSize: responseCache.size,
+      sseClients: sseClients.size,
+      alertHistoryCount: alertHistory.length,
+      trafficLogCount: trafficLog.length,
+      nodeVersion: process.version,
+    },
+  });
 });
 
 // ============================
@@ -362,11 +589,17 @@ function checkAlerts() {
   const thresholds = sim.getThresholds();
   if (!overview.isUnlimited && overview.usedPercent > thresholds.trafficWarn && !alertSent.traffic) {
     alertSent.traffic = true;
-    app.locals.broadcastSSE('alert', { type: 'traffic', msg: `Traffic usage exceeds ${thresholds.trafficWarn}%`, severity: 'warning' });
+    const msg = `Traffic usage exceeds ${thresholds.trafficWarn}%`;
+    app.locals.broadcastSSE('alert', { type: 'traffic', msg, severity: 'warning' });
+    alertHistory.push({ time: new Date().toISOString(), type: 'traffic', message: msg, severity: 'warning' });
+    if (alertHistory.length > 500) alertHistory.shift();
   }
   if (overview.balance < thresholds.balanceWarn && overview.balance > 0 && !alertSent.balance) {
     alertSent.balance = true;
-    app.locals.broadcastSSE('alert', { type: 'balance', msg: `Balance below CNY ${thresholds.balanceWarn}`, severity: 'warning' });
+    const msg = `Balance below CNY ${thresholds.balanceWarn}`;
+    app.locals.broadcastSSE('alert', { type: 'balance', msg, severity: 'warning' });
+    alertHistory.push({ time: new Date().toISOString(), type: 'balance', message: msg, severity: 'warning' });
+    if (alertHistory.length > 500) alertHistory.shift();
   }
 }
 setInterval(checkAlerts, 30000);
