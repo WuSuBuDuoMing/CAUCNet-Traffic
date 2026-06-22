@@ -89,7 +89,59 @@ npm install -g caucnet-traffic
 
 ```bash
 docker build -t caucnet-traffic .
-docker run -p 3000:3000 caucnet-traffic
+docker run -d -p 3004:3004 --name caucnet-traffic caucnet-traffic
+```
+
+#### Docker Compose
+
+```bash
+# Start in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+#### macOS
+
+```bash
+# Install Node.js via Homebrew
+brew install node
+
+# Clone and start
+git clone https://github.com/WuSuBuDuoMing/CAUCNet-Traffic.git
+cd CAUCNet-Traffic
+npm install
+npm start
+```
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+# Install Node.js via package manager
+sudo apt update
+sudo apt install nodejs npm
+
+# Clone and start
+git clone https://github.com/WuSuBuDuoMing/CAUCNet-Traffic.git
+cd CAUCNet-Traffic
+npm install
+npm start
+```
+
+#### Windows
+
+1. Download and install [Node.js](https://nodejs.org/) (>= 18.0) from the official website.
+2. Open **PowerShell** or **Command Prompt**:
+
+```powershell
+git clone https://github.com/WuSuBuDuoMing/CAUCNet-Traffic.git
+cd CAUCNet-Traffic
+npm install
+npm start
 ```
 
 ### Configuration
